@@ -1,0 +1,96 @@
+---
+title: "Bamboo Africa Report"
+subtitle: "GFD"
+
+output:
+  tufte::tufte_html: default
+
+---
+
+```{r setup, include=FALSE}
+library(tufte)
+# invalidate cache when the tufte version changes
+knitr::opts_chunk$set(tidy = FALSE, cache.extra = packageVersion('tufte'), warning = FALSE, message = FALSE)
+options(htmltools.dir.version = FALSE)
+```
+
+```{r}
+
+
+library(tidyverse)
+library(magrittr)
+library(rjson)
+
+# Viết hàm lấy dữ liệu ở định dạng json: 
+
+get_data_from_json <- function(json_link) {
+  json_data <- fromJSON(paste(readLines(json_link), collapse = ""))
+  json_data %>% 
+    lapply(unlist) ->> u
+  u <- do.call("bind_rows", u)
+  return(u)
+}
+
+# Sử dụng hàm: 
+
+df_postgres <- get_data_from_json("http://inbar.gfd.com.vn:2206/download/json")
+
+df_postgres %>% 
+  group_by(country) %>% 
+  count() ->> country
+
+# Các quốc gia: 
+library(highcharter)
+
+highchart() %>% 
+  hc_xAxis(categories = country$country) %>% 
+  hc_add_series(data = country$n, 
+                color = "#104E8B", 
+                name = "Number of Observations", 
+                # Tắt hiển thự thừa: 
+                showInLegend = FALSE) %>% 
+  hc_chart(type = "bar") %>% 
+  hc_title(text = "Number of Observations by Country") %>% 
+  hc_credits(text = "Data Source: http://gfd.com.vn/", 
+             # Cho phép hiển thị caption: 
+             enabled =  TRUE, 
+             # Kích cỡ phông chữ: 
+             style = list(fontSize = 14)) %>% 
+  hc_add_theme(hc_theme_538())
+
+
+# Viết hàm tạo bar plot cho từng tình của quốc gia được chọn: 
+
+province_country_barplot <- function(x) {
+  ken_prov <- df_postgres %>% 
+    filter(country == x) %>% 
+    group_by(province) %>% 
+    count() %>% 
+    ungroup() %>% 
+    arrange(-n)
+  
+  title = paste0("Number of Observations by Province for ", x)
+  
+  highchart() %>% 
+    hc_xAxis(categories = ken_prov$province) %>% 
+    hc_add_series(data = ken_prov$n, 
+                  color = "#104E8B", 
+                  name = "Number of Observations", 
+                  showInLegend = FALSE) %>% 
+    hc_chart(type = "bar") %>% 
+    hc_title(text = title) %>% 
+    hc_credits(text = "Data Source: http://gfd.com.vn/", 
+               enabled =  TRUE, 
+               style = list(fontSize = 14)) %>% 
+    hc_add_theme(hc_theme_538())
+  
+}
+
+# Sử dụng hàm: 
+
+province_country_barplot("Uganda")
+province_country_barplot("Kenya")
+province_country_barplot("Ethiopia")
+
+```
+
